@@ -2,24 +2,29 @@ package service
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/yanetrodriguez25/twitter/src/domain"
 )
 
 type TweetManager struct {
-	tweets    []domain.Tweet
-	tweetsMap map[string][]domain.Tweet
+	tweets       []domain.Tweet
+	tweetsMap    map[string][]domain.Tweet
+	tweetWritter TweetWritter
 }
 
-func NewTweetManager() *TweetManager {
+func NewTweetManager(unTweetWritter TweetWritter) *TweetManager {
 	tweetManager := TweetManager{}
-	tweetManager.initializeService()
+	tweetManager.initializeService(unTweetWritter)
+
 	return &tweetManager
 }
 
-func (tm *TweetManager) initializeService() {
+func (tm *TweetManager) initializeService(unTweetWritter TweetWritter) {
 	tm.tweets = make([]domain.Tweet, 0)
 	tm.tweetsMap = make(map[string][]domain.Tweet)
+	tm.tweetWritter = unTweetWritter
+
 }
 
 func (tm *TweetManager) PublishTweet(unTweet domain.Tweet) (int, error) {
@@ -41,8 +46,13 @@ func (tm *TweetManager) PublishTweet(unTweet domain.Tweet) (int, error) {
 
 	tm.tweetsMap[unTweet.GetUser()] = append(tm.tweetsMap[unTweet.GetUser()], unTweet)
 
+	tm.tweetWritter.Write(unTweet)
 	return unTweet.GetId(), nil
 
+}
+
+func (tm *TweetManager) GetTweetWritter() TweetWritter {
+	return tm.tweetWritter
 }
 
 func (tm *TweetManager) GetTweets() []domain.Tweet {
@@ -66,4 +76,14 @@ func (tm *TweetManager) CountTweetsByUser(user string) int {
 
 func (tm *TweetManager) GetTweetsByUser(user string) []domain.Tweet {
 	return tm.tweetsMap[user]
+}
+
+func (tm *TweetManager) SearchTweetsContaining(query string, channel chan domain.Tweet) {
+	go func() {
+		for _, t := range tm.GetTweets() {
+			if strings.Contains(t.GetUser(), query) || strings.Contains(t.GetText(), query) {
+				channel <- t
+			}
+		}
+	}()
 }

@@ -1,5 +1,6 @@
 package service_test // este  no se compila.. tiene que tener el mismo nombre del paquete + _test
 import (
+	"strings"
 	"testing"
 
 	"github.com/yanetrodriguez25/twitter/src/domain"
@@ -7,7 +8,9 @@ import (
 )
 
 func TestPublishedTweetIsSaved(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 	var tweet *domain.TextTweet
 	user := "yanetrodriguez25"
 	text := "This is my first tweet"
@@ -26,7 +29,9 @@ func TestPublishedTweetIsSaved(t *testing.T) {
 }
 
 func TestTweetWithoutUserIsNotPublished(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 	var tweet *domain.TextTweet
 	var user string
 	text := "This is my first tweet"
@@ -41,7 +46,9 @@ func TestTweetWithoutUserIsNotPublished(t *testing.T) {
 }
 
 func TestTweetWithoutTextIsNotPublished(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 
 	var tweet *domain.TextTweet
 	var text string
@@ -57,7 +64,9 @@ func TestTweetWithoutTextIsNotPublished(t *testing.T) {
 }
 
 func TestTweetWhichExceeding140CharactersIsNotPublished(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 
 	var tweet *domain.TextTweet
 	user := "yanetrodriguez25"
@@ -73,7 +82,9 @@ func TestTweetWhichExceeding140CharactersIsNotPublished(t *testing.T) {
 }
 
 func TestCanPublishAndRetrieveMoreThanOneTweet(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 
 	var tweet, secondTweet *domain.TextTweet
 
@@ -107,7 +118,9 @@ func TestCanPublishAndRetrieveMoreThanOneTweet(t *testing.T) {
 }
 
 func TestCanRetrieveTweetById(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 
 	var tweet *domain.TextTweet
 	var id int
@@ -125,7 +138,9 @@ func TestCanRetrieveTweetById(t *testing.T) {
 }
 
 func TestCanCountTheTweetsSentByAnUser(t *testing.T) {
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 
 	var tweet, secondTweet, thirdTweet *domain.TextTweet
 	user := "grupoesfera"
@@ -150,7 +165,9 @@ func TestCanCountTheTweetsSentByAnUser(t *testing.T) {
 
 func TestCanRetrieveTheTweetsSentByAnUser(t *testing.T) {
 	// Initialization
-	manager := service.NewTweetManager()
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
 	var tweet, secondTweet, thirdTweet *domain.TextTweet
 	user := "grupoesfera"
 	anotherUser := "nick"
@@ -180,6 +197,55 @@ func TestCanRetrieveTheTweetsSentByAnUser(t *testing.T) {
 	}
 
 	if !isValidTweet(t, secondPublishedTweet, id2, user, secondText) {
+		return
+	}
+}
+
+func TestPublishedTweetIsSavedToExternalResource(t *testing.T) {
+	tweetWritter := service.NewMockTweetWritter()
+	manager := service.NewTweetManager(tweetWritter)
+
+	var tweet *domain.TextTweet
+	text := "This is my first tweet"
+	user := "yan"
+	tweet = domain.NewTextTweet(user, text)
+
+	id, _ := manager.PublishTweet(tweet)
+
+	mockWritter := (manager.GetTweetWritter()).(*service.MockTweetWritter)
+	savedTweet := mockWritter.GetLastSavedTweet()
+	if savedTweet == nil {
+		t.Error("savedTweet should not be nil")
+		return
+	}
+	if !isValidTweet(t, savedTweet, id, user, text) {
+		return
+	}
+}
+
+func TestCanSearchForTweetContainingText(t *testing.T) {
+	var tweetWritter service.TweetWritter
+	tweetWritter = service.NewMockTweetWritter()
+	tweetManager := service.NewTweetManager(tweetWritter)
+
+	var tweet *domain.TextTweet
+	text := "This is my first tweet"
+	user := "yan"
+	tweet = domain.NewTextTweet(user, text)
+	tweetManager.PublishTweet(tweet)
+
+	searhResult := make(chan domain.Tweet)
+	query := "first"
+
+	tweetManager.SearchTweetsContaining(query, searhResult)
+	foundTweet := <-searhResult
+
+	if foundTweet == nil {
+		t.Error("Found tweet should not be nil")
+		return
+	}
+	if !strings.Contains(foundTweet.GetText(), query) {
+		t.Errorf("Not found a tweet with %s", query)
 		return
 	}
 }
